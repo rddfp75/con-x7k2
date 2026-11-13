@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Consumos</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#1f4e6b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Consumos">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0}
+body{font-family:Barlow,system-ui,sans-serif;background:#eef2f4;color:#16303f;padding-bottom:40px;-webkit-text-size-adjust:100%}
+.top{background:#1f4e6b;color:#fff;padding:calc(12px + env(safe-area-inset-top)) 16px 12px;display:flex;justify-content:space-between;align-items:center}
+.top h1{font-size:20px;font-weight:700}.top small{display:block;font-size:12px;opacity:.8}
+.top button{background:none;border:0;color:#fff;font-size:22px}
+.estado{margin:8px 12px 0;padding:6px 10px;border-radius:10px;font-size:12px;font-weight:600}
+.estado.o{background:#dff3e4;color:#17692f}.estado.w{background:#fff4d6;color:#8a5a00}.estado.e{background:#fde3e1;color:#a3261d}
+.tabs{display:flex;gap:6px;padding:10px 12px;position:sticky;top:0;background:#eef2f4;z-index:2}
+.tab{flex:1;padding:9px 4px;border-radius:12px;border:2px solid #cdd9df;background:#fff;font:600 13px/1.15 Barlow;color:#1f4e6b;text-align:center}
+.tab small{display:block;font-weight:400;font-size:11px;opacity:.8}
+.tab.on{background:#1f4e6b;color:#fff;border-color:#1f4e6b}
+.card{background:#fff;border-radius:16px;margin:10px 12px;padding:14px;box-shadow:0 1px 4px #0001}
+.card h2{font-size:15px;color:#1f4e6b;margin-bottom:6px}
+label{display:block;font-size:12px;color:#5b7482;margin:10px 0 3px;font-weight:600}
+input[type=number],input[type=text],input[type=datetime-local],select{width:100%;padding:12px;font:600 18px Barlow;border:2px solid #cdd9df;border-radius:10px;background:#f8fafb;color:#16303f}
+input[type=datetime-local]{font-size:16px;min-height:50px}
+input:focus,select:focus{outline:none;border-color:#1f4e6b}
+.prev{font-size:12px;color:#5b7482;margin-top:3px}
+.chk{display:flex;align-items:center;gap:10px;margin-top:12px;padding:10px;border-radius:10px;background:#f1f6f9;font-weight:600;font-size:14px;color:#16303f}
+.chk input{width:22px;height:22px}
+.res{margin-top:10px;border-radius:12px;padding:8px 12px;background:#f1f6f9}
+.res div{display:flex;justify-content:space-between;font-size:14px;padding:3px 0}
+.res b{font-size:16px}
+.big{text-align:center;padding:14px;border-radius:12px;margin-top:10px;font-weight:700}
+.big span{display:block;font-size:34px;line-height:1.1}
+.ok{background:#dff3e4;color:#17692f}.bad{background:#fde3e1;color:#a3261d}.na{background:#e8eef1;color:#35505f}
+button.p{width:100%;margin-top:12px;padding:14px;border:0;border-radius:12px;background:#1f4e6b;color:#fff;font:700 16px Barlow}
+button.s{width:100%;margin-top:8px;padding:12px;border:2px solid #1f4e6b;border-radius:12px;background:#fff;color:#1f4e6b;font:700 15px Barlow}
+.ban{margin:10px 12px 0;padding:12px;border-radius:14px;background:#fff4d6;border:2px solid #e8b931;color:#6b4a00;font-weight:600;font-size:14px}
+.ban button{margin-top:8px;width:100%;padding:11px;border:0;border-radius:10px;background:#e8b931;color:#3d2b00;font:700 15px Barlow}
+.ban button.b2{background:none;border:2px solid #e8b931}
+.mes{margin-top:6px}
+.file{margin-top:10px;padding:10px 12px;border-radius:10px;background:#f1f6f9;font-size:13px}.file b{display:block;font-size:15px;color:#1f4e6b}
+.hr{border-bottom:1px solid #e3eaee;padding:9px 0;position:relative}
+.hh{display:flex;justify-content:space-between;font-size:13px}.hh span{color:#5b7482}
+.hv{font-size:13px;color:#35505f;margin-top:2px}
+.hc{font-size:14px;margin-top:3px}.tg{color:#17692f}.tr{color:#a3261d}
+.ho{font-size:12px;color:#8a5a00;margin-top:2px}
+.an{margin-top:5px;padding:4px 10px;border:1px solid #cdd9df;border-radius:8px;background:#fff;color:#5b7482;font:600 12px Barlow}
+#flash{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#17692f;color:#fff;padding:10px 18px;border-radius:20px;font-weight:700;opacity:0;transition:opacity .3s;pointer-events:none;z-index:9}
+</style></head><body>
+<div class="top"><div><h1>Consumos</h1><small id="quien"></small></div><button id="ajustes" aria-label="Ajustes">⚙️</button></div>
+<div id="setup" style="display:none"></div>
+<div id="main">
+  <div class="estado o" id="estado">…</div>
+  <div class="tabs" id="tabs"></div>
+  <div id="ban"></div>
+  <div id="ex" style="display:none"></div>
+  <div class="card"><h2 id="formtit"></h2><div id="form"></div><div id="res"></div><button class="p" id="guardar">Guardar lectura</button></div>
+  <div class="card"><h2>Últimas lecturas</h2><div id="hist"></div></div>
+</div>
+<div id="flash"></div>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="jszip.min.js"></script>
+<script src="firebase-config.js"></script>
+<script src="calc.js"></script>
+<script src="app.js"></script>
+</body></html>
