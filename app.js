@@ -257,6 +257,7 @@
   function init() {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(function () {});
     $('ajustes').onclick = function () { pantallaAjustes('Ajustes'); };
+    $('b_exp_fijo').onclick = function () { abrirExport(meses()[0]); };
     var cfg = window.FB_CONFIG;
     if (!window.firebase || !cfg || !cfg.apiKey || String(cfg.apiKey).indexOf('PEGAR') === 0) {
       $('main').style.display = 'none'; $('setup').style.display = 'block';
