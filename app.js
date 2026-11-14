@@ -8,6 +8,11 @@
   };
   var st = { ctl: 'arco', lect: [], cache: false, pend: false, err: '', file: null };
   var col = null;
+  function cargarLim() {
+    var o = {}; try { o = JSON.parse(LS.get('cs_lim') || '{}') || {}; } catch (e) {}
+    ['aguaMin', 'aguaMax', 'jMin', 'jMax'].forEach(function (k) { if (o[k] !== undefined) C.LIM[k] = o[k]; });
+  }
+  cargarLim();
 
   /* ---------- utilidades ---------- */
   function pad(n) { return (n < 10 ? '0' : '') + n; }
@@ -35,11 +40,23 @@
       '<label>¿Quién apunta? (tu nombre)</label><input id="s_n" type="text" value="' + esc(nombre() || '') + '" placeholder="Rubén">' +
       '<label>Código del equipo</label><input id="s_c" type="text" value="' + esc(codigo() || '') + '" placeholder="el que os diga Rubén" autocapitalize="none" autocorrect="off">' +
       '<div class="prev">El código tiene que ser <b>el mismo en todos los móviles</b>: así todos ven las mismas lecturas. Solo letras, números y guiones.</div>' +
+      '<h2 style="margin-top:16px">Avisos a mantenimiento</h2>' +
+      '<label>Correo servicios generales (arco, CS1)</label><input id="s_mg" type="text" value="' + esc(LS.get('cs_mail_sg') || '') + '" autocapitalize="none" autocorrect="off">' +
+      '<label>Correo mantenimiento CS3 (jumbos)</label><input id="s_m3" type="text" value="' + esc(LS.get('cs_mail_cs3') || '') + '" autocapitalize="none" autocorrect="off">' +
+      '<label>Arco · agua por día laborable: mínimo (L)</label><input id="s_amin" type="number" inputmode="decimal" value="' + (C.LIM.aguaMin == null ? '' : C.LIM.aguaMin) + '">' +
+      '<label>Arco · agua por día laborable: máximo (L)</label><input id="s_amax" type="number" inputmode="decimal" value="' + (C.LIM.aguaMax == null ? '' : C.LIM.aguaMax) + '">' +
+      '<label>Jumbos CS3 · consumo por día laborable: mínimo (L)</label><input id="s_jmin" type="number" inputmode="decimal" value="' + (C.LIM.jMin == null ? '' : C.LIM.jMin) + '">' +
+      '<label>Jumbos CS3 · consumo por día laborable: máximo (L)</label><input id="s_jmax" type="number" inputmode="decimal" value="' + (C.LIM.jMax == null ? '' : C.LIM.jMax) + '">' +
+      '<div class="prev">Si dejas un límite vacío, no se avisa por ese lado. Estos ajustes son de este móvil.</div>' +
       '<button class="p" id="s_ok">Guardar y entrar</button></div>';
     $('s_ok').onclick = function () {
       var n = $('s_n').value.trim(), c = $('s_c').value.trim().toLowerCase().replace(/[^a-z0-9\-_]/g, '');
       if (!n || c.length < 4) { alert('Escribe tu nombre y un código de al menos 4 letras o números.'); return; }
-      LS.set('cs_nombre', n); LS.set('cs_codigo', c); location.reload();
+      LS.set('cs_nombre', n); LS.set('cs_codigo', c);
+      LS.set('cs_mail_sg', $('s_mg').value.trim()); LS.set('cs_mail_cs3', $('s_m3').value.trim());
+      function lim(id) { var v = $(id).value.trim().replace(',', '.'); if (v === '') return null; var x = parseFloat(v); return isNaN(x) ? null : x; }
+      LS.set('cs_lim', JSON.stringify({ aguaMin: lim('s_amin'), aguaMax: lim('s_amax'), jMin: lim('s_jmin'), jMax: lim('s_jmax') }));
+      location.reload();
     };
   }
 
@@ -86,9 +103,74 @@
     var ls = ordenadas(c);
     if (!ls.length) { r.innerHTML = box('—', 'Primera lectura: se guarda como punto de partida', 'na'); return; }
     if (o.cambio && o.antes === undefined) { r.innerHTML = box('—', 'Escribe lo que marcaba la varilla antes del cambio', 'na'); return; }
-    var res = C.calcular(c, ls.concat([o])), d = null;
+    var d = dActual(o), was = $('f_avis') && $('f_avis').checked;
+    r.innerHTML = consumo(c, d, true) + avisoHtml(c, o, d);
+    if (was && $('f_avis')) $('f_avis').checked = true;
+  }
+  function dActual(o) {
+    var ls = ordenadas(o.ctl); if (!ls.length) return null;
+    var res = C.calcular(o.ctl, ls.concat([o])), d = null;
     for (var i = 0; i < res.length; i++) if (res[i].r === o) d = res[i];
-    r.innerHTML = consumo(c, d, true);
+    return d;
+  }
+
+  /* ---------- avisos a mantenimiento ---------- */
+  function fmtL(x) { return fn(x, 0); }
+  function hora(ts) { var d = new Date(ts); return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear(); }
+  function hhmm(ts) { var d = new Date(ts); return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+  function rangoTxt(mn, mx, u, pre) {
+    if (mn != null && mx != null) return pre + ': ' + fn(mn, 0) + '–' + fn(mx, 0) + ' ' + u;
+    if (mn != null) return pre + ': mínimo ' + fn(mn, 0) + ' ' + u;
+    if (mx != null) return pre + ': máximo ' + fn(mx, 0) + ' ' + u;
+    return '';
+  }
+  /* incidencias de una lectura: [{k, txt, linea}] */
+  function incidencias(c, d) {
+    var L = [];
+    if (!d) return L;
+    if (c === 'arco') {
+      if (d.aguaEst) {
+        var rg = rangoTxt(C.LIM.aguaMin, C.LIM.aguaMax, 'L', 'rango habitual');
+        var q = d.dias === 1 ? fmtL(d.agua) + ' L en el día' : fmtL(d.agua) + ' L en ' + d.dias + ' días laborables (' + fmtL(d.aguaDia) + ' L por día)';
+        L.push({ k: 'agua', cod: 'Agua ' + d.aguaEst, txt: 'consumo de agua ' + d.aguaEst, linea: 'Consumo de agua ' + d.aguaEst + ': ' + q + (rg ? ' (' + rg + ')' : '') });
+      }
+      if (d.concEst) L.push({ k: 'conc', cod: 'Concentración ' + d.concEst, txt: 'concentración ' + d.concEst, linea: 'Concentración de Zotal ' + d.concEst + ': ' + fn(d.conc, 1) + ' % (rango correcto: ' + CT.arco.rmin + '–' + CT.arco.rmax + ' %)' });
+    } else if (c === 'jum' && d.jEst) {
+      var rj = rangoTxt(C.LIM.jMin, C.LIM.jMax, 'L por día laborable', 'rango habitual');
+      L.push({ k: 'jum', cod: 'Consumo ' + d.jEst, txt: 'consumo ' + d.jEst, linea: 'Consumo de Deogen ' + d.jEst + ': ' + fn(d.cm, 1) + ' cm (' + fmtL(d.litros) + ' L) desde la última lectura' + (d.dias > 1 ? ' (' + d.dias + ' días laborables)' : '') + (rj ? ' (' + rj + ')' : '') });
+    }
+    return L;
+  }
+  function correo(c, o, d) {
+    var L = incidencias(c, d); if (!L.length) return null;
+    var f = hora(o.ts), solo = L.length === 1 ? L[0] : null, cuerpo = 'Buenos días:\n\n', asunto, para;
+    if (c === 'arco') {
+      cuerpo += 'En la lectura del arco de desinfección de CS1 del ' + f + ' (' + hhmm(o.ts) + ') ';
+      if (solo) {
+        cuerpo += solo.k === 'agua' ? 'el consumo de agua ha sido ' + d.aguaEst + ': ' + L[0].linea.split(': ').slice(1).join(': ') + '.' : 'la concentración de Zotal está ' + d.concEst + ': ' + fn(d.conc, 1) + ' % (rango correcto: ' + CT.arco.rmin + '–' + CT.arco.rmax + ' %).';
+        asunto = 'Arco de desinfección CS1 · ' + (solo.k === 'agua' ? 'Consumo de agua ' + (d.aguaEst === 'ALTO' ? 'alto' : 'bajo') : 'Concentración ' + (d.concEst === 'ALTA' ? 'alta' : 'baja')) + ' · ' + f;
+      } else {
+        cuerpo += 'hemos detectado dos incidencias:\n\n' + L.map(function (x) { return '- ' + x.linea + '.'; }).join('\n');
+        asunto = 'Arco de desinfección CS1 · Consumo de agua y concentración fuera de rango · ' + f;
+      }
+      cuerpo += '\n\nOs pedimos que ' + (solo && solo.k === 'conc' ? 'reviséis la dosificación' : 'lo reviséis') + '.';
+      para = LS.get('cs_mail_sg') || '';
+    } else {
+      cuerpo += 'En la lectura del GRG de Deogen de la lavadora de jumbos de CS3 del ' + f + ' el consumo ha sido ' + d.jEst + ': ' + L[0].linea.split(': ').slice(1).join(': ') + '.\n\nOs pedimos que lo reviséis.';
+      asunto = 'Lavadora de jumbos CS3 · Consumo de Deogen ' + (d.jEst === 'ALTO' ? 'alto' : 'bajo') + ' · ' + f;
+      para = LS.get('cs_mail_cs3') || '';
+    }
+    cuerpo += '\n\nGracias.\n' + (nombre() || '');
+    return { para: para, asunto: asunto, cuerpo: cuerpo, L: L };
+  }
+  function avisoHtml(c, o, d) {
+    var m = correo(c, o, d); if (!m) return '';
+    var dest = c === 'arco' ? 'servicios generales' : 'mantenimiento de CS3';
+    var href = 'mailto:' + encodeURIComponent(m.para).replace(/%40/g, '@') + '?subject=' + encodeURIComponent(m.asunto) + '&body=' + encodeURIComponent(m.cuerpo);
+    return '<div class="ban" style="margin:10px 0 0">⚠ Avisar a ' + dest + '<div style="font-weight:400;font-size:13px;margin-top:2px">' + m.L.map(function (x) { return esc(x.cod); }).join(' · ') + '</div>' +
+      '<a href="' + href + '" style="display:block;margin-top:8px;padding:11px;border-radius:10px;background:#e8b931;color:#3d2b00;font:700 15px Barlow;text-align:center;text-decoration:none">✉️ Enviar aviso por correo</a>' +
+      (m.para ? '' : '<div style="font-weight:400;font-size:12px;margin-top:6px">Falta el correo de ' + dest + ': ponlo en ⚙️ Ajustes.</div>') +
+      '<label class="chk" style="margin-top:8px;background:#fffaf0"><input id="f_avis" type="checkbox"> Ya he avisado</label></div>';
   }
 
   /* HTML de resultado: grande si grande=true */
@@ -126,6 +208,8 @@
     if (!o) { alert('Faltan datos: rellena los campos de arriba.'); return; }
     if (o.cambio && o.antes === undefined) { alert('Escribe lo que marcaba la varilla antes del cambio.'); return; }
     if (!col) return;
+    var dd = dActual(o), inc = dd ? incidencias(o.ctl, dd) : [];
+    if (inc.length) { o.inc = inc.map(function (x) { return x.cod; }); o.avisado = !!($('f_avis') && $('f_avis').checked); }
     col.add(o).catch(function (e) { st.err = e.message; updateAll(); });
     flash('Lectura guardada ✔');
     drawForm();
@@ -148,6 +232,7 @@
       if (r.cambio) v += ' · <b>CAMBIO</b>' + (r.antes != null ? ' (antes ' + fn(r.antes, 1) + ')' : '');
       h += '<div class="hr"><div class="hh"><b>' + fmtC(r.ts) + '</b><span>' + esc(r.autor || '') + '</span></div><div class="hv">' + v + '</div>';
       var cs = consumo(c, d, false); if (cs) h += '<div class="hc">' + cs + '</div>';
+      if (r.inc && r.inc.length) h += '<div class="ho">⚠ ' + esc(r.inc.join(' · ')) + ' · ' + (r.avisado ? 'avisado ✔' : '<b>SIN AVISAR</b>') + '</div>';
       if (r.obs) h += '<div class="ho">' + esc(r.obs) + '</div>';
       h += '<button class="an" data-id="' + r.id + '">Anular</button></div>';
     });
@@ -187,7 +272,7 @@
       var r = d.r; if (ym(r.ts) !== k) return;
       var ob = (r.cambio ? 'Cambio de barril' + (r.antes != null ? ' (antes: ' + r.antes + ')' : '') + (r.obs ? '. ' : '') : '') + (r.obs || '');
       ar.push([fmtF(r.ts), r.c, d.agua !== undefined ? d.agua : null, r.cambio ? 'SÍ' : '', r.v, d.prod !== undefined ? d.prod : null,
-        d.conc != null ? { v: d.conc, s: d.enRango ? 'ok' : 'bad' } : null, d.conc != null ? (d.enRango ? 'En rango' : 'FUERA DE RANGO') : '', ob, r.autor || '']);
+        d.conc != null ? { v: d.conc, s: d.enRango ? 'ok' : 'bad' } : null, d.conc != null ? (d.enRango ? 'En rango' : 'FUERA DE RANGO') : '', ob, r.autor || '', (r.inc || []).join(' · '), r.inc && r.inc.length ? (r.avisado ? 'Sí' : 'NO') : '']);
     });
     C.calcular('pel', ordenadas('pel')).forEach(function (d) {
       var r = d.r; if (ym(r.ts) !== k) return;
@@ -197,12 +282,12 @@
     C.calcular('jum', ordenadas('jum')).forEach(function (d) {
       var r = d.r; if (ym(r.ts) !== k) return;
       var ob = (r.cambio ? 'Cambio de GRG' + (r.antes != null ? ' (antes: ' + r.antes + ' cm)' : '') + (r.obs ? '. ' : '') : '') + (r.obs || '');
-      ju.push([fmtF(r.ts), r.v, r.cambio ? 'SÍ' : '', d.cm !== undefined ? d.cm : null, d.litros !== undefined ? d.litros : null, r.j != null ? r.j : null, d.jumbos !== undefined ? d.jumbos : null, d.ljumbo !== undefined ? d.ljumbo : null, d.ejumbo !== undefined ? d.ejumbo : null, ob, r.autor || '']);
+      ju.push([fmtF(r.ts), r.v, r.cambio ? 'SÍ' : '', d.cm !== undefined ? d.cm : null, d.litros !== undefined ? d.litros : null, r.j != null ? r.j : null, d.jumbos !== undefined ? d.jumbos : null, d.ljumbo !== undefined ? d.ljumbo : null, d.ejumbo !== undefined ? d.ejumbo : null, ob, r.autor || '', (r.inc || []).join(' · '), r.inc && r.inc.length ? (r.avisado ? 'Sí' : 'NO') : '']);
     });
     return [
-      { nombre: 'Arco', cols: [{ h: 'FECHA Y HORA', w: 18 }, { h: 'CONTADOR AGUA (m³)', w: 14, f: 'n3' }, { h: 'CONSUMO AGUA (L)', w: 14, f: 'n0' }, { h: 'CAMBIO BARRIL', w: 10 }, { h: 'VARILLA (L)', w: 11, f: 'n1' }, { h: 'CONSUMO ZOTAL (L)', w: 13, f: 'n1' }, { h: 'CONCENTRACIÓN (%) rango 1–2', w: 16, f: 'n2' }, { h: 'ESTADO', w: 16 }, { h: 'OBSERVACIONES', w: 40 }, { h: 'REGISTRADO POR', w: 14 }], filas: ar },
+      { nombre: 'Arco', cols: [{ h: 'FECHA Y HORA', w: 18 }, { h: 'CONTADOR AGUA (m³)', w: 14, f: 'n3' }, { h: 'CONSUMO AGUA (L)', w: 14, f: 'n0' }, { h: 'CAMBIO BARRIL', w: 10 }, { h: 'VARILLA (L)', w: 11, f: 'n1' }, { h: 'CONSUMO ZOTAL (L)', w: 13, f: 'n1' }, { h: 'CONCENTRACIÓN (%) rango 1–2', w: 16, f: 'n2' }, { h: 'ESTADO', w: 16 }, { h: 'OBSERVACIONES', w: 40 }, { h: 'REGISTRADO POR', w: 14 }, { h: 'INCIDENCIA', w: 24 }, { h: 'AVISADO A MANTENIMIENTO', w: 14 }], filas: ar },
       { nombre: 'Peladora CS1', cols: [{ h: 'FECHA Y HORA', w: 18 }, { h: 'VARILLA (cm)', w: 11, f: 'n1' }, { h: 'CAMBIO GRG', w: 10 }, { h: 'CONSUMO (cm)', w: 12, f: 'n1' }, { h: 'CONSUMO (L)', w: 12, f: 'n1' }, { h: 'DOSIFICACIÓN BOMBA', w: 14 }, { h: 'Nº CERDOS', w: 11, f: 'n0' }, { h: 'L/CERDO', w: 10, f: 'n3' }, { h: 'OBSERVACIONES', w: 40 }, { h: 'REGISTRADO POR', w: 14 }], filas: pe },
-      { nombre: 'Jumbos CS3', cols: [{ h: 'FECHA Y HORA', w: 18 }, { h: 'VARILLA (cm)', w: 11, f: 'n1' }, { h: 'CAMBIO GRG', w: 10 }, { h: 'CONSUMO (cm)', w: 12, f: 'n1' }, { h: 'CONSUMO (L)', w: 12, f: 'n1' }, { h: 'CONTADOR JUMBOS', w: 14, f: 'n0' }, { h: 'JUMBOS LAVADOS', w: 12, f: 'n0' }, { h: 'L/JUMBO', w: 10, f: 'n3' }, { h: '€/JUMBO', w: 10, f: 'n3' }, { h: 'OBSERVACIONES', w: 40 }, { h: 'REGISTRADO POR', w: 14 }], filas: ju }
+      { nombre: 'Jumbos CS3', cols: [{ h: 'FECHA Y HORA', w: 18 }, { h: 'VARILLA (cm)', w: 11, f: 'n1' }, { h: 'CAMBIO GRG', w: 10 }, { h: 'CONSUMO (cm)', w: 12, f: 'n1' }, { h: 'CONSUMO (L)', w: 12, f: 'n1' }, { h: 'CONTADOR JUMBOS', w: 14, f: 'n0' }, { h: 'JUMBOS LAVADOS', w: 12, f: 'n0' }, { h: 'L/JUMBO', w: 10, f: 'n3' }, { h: '€/JUMBO', w: 10, f: 'n3' }, { h: 'OBSERVACIONES', w: 40 }, { h: 'REGISTRADO POR', w: 14 }, { h: 'INCIDENCIA', w: 24 }, { h: 'AVISADO A MANTENIMIENTO', w: 14 }], filas: ju }
     ];
   }
   function generar(k) {

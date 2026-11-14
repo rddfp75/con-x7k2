@@ -6,6 +6,16 @@
     jum: { nombre: 'Jumbos CS3', prod: 'Deogen', lcm: 10.62, eur: 0.67 }
   };
 
+  /* límites de aviso (los puede cambiar la app desde Ajustes) */
+  var LIM = { aguaMin: 400, aguaMax: 1800, jMin: null, jMax: null };
+  /* días laborables (lunes a viernes) entre dos lecturas; mínimo 1 */
+  function laborables(t0, t1) {
+    var d = new Date(t0); d.setHours(0, 0, 0, 0);
+    var f = new Date(t1); f.setHours(0, 0, 0, 0), n = 0;
+    while (d < f) { d.setDate(d.getDate() + 1); var w = d.getDay(); if (w !== 0 && w !== 6) n++; }
+    return n < 1 ? 1 : n;
+  }
+
   /* lista: lecturas de UN control, sin anuladas. Se ordena por ts. Devuelve [{r, ...derivados}] */
   function calcular(ctl, lista) {
     var ls = lista.slice().sort(function (a, b) { return a.ts - b.ts; });
@@ -20,9 +30,16 @@
             d.agua = agua; d.prod = pr;
             d.conc = t > 0 ? pr / t * 100 : null;
             d.enRango = d.conc !== null && d.conc >= CT.arco.rmin && d.conc <= CT.arco.rmax;
+            d.dias = laborables(prev.ts, r.ts); d.aguaDia = agua / d.dias;
+            if (agua >= 0) { if (LIM.aguaMin != null && d.aguaDia < LIM.aguaMin) d.aguaEst = 'BAJO'; else if (LIM.aguaMax != null && d.aguaDia > LIM.aguaMax) d.aguaEst = 'ALTO'; }
+            if (d.conc !== null) { if (d.conc < CT.arco.rmin) d.concEst = 'BAJA'; else if (d.conc > CT.arco.rmax) d.concEst = 'ALTA'; }
           } else {
             d.cm = prev.v - base;
             d.litros = d.cm * CT[ctl].lcm;
+            if (ctl === 'jum') {
+              d.dias = laborables(prev.ts, r.ts); d.litrosDia = d.litros / d.dias;
+              if (d.litros >= 0) { if (LIM.jMin != null && d.litrosDia < LIM.jMin) d.jEst = 'BAJO'; else if (LIM.jMax != null && d.litrosDia > LIM.jMax) d.jEst = 'ALTO'; }
+            }
             if (ctl === 'pel' && r.q) d.lcerdo = d.litros / r.q;
             if (ctl === 'jum' && r.j !== null && r.j !== undefined && prevJ !== null) {
               d.jumbos = r.j - prevJ;
@@ -105,6 +122,6 @@
     return z.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
   }
 
-  var api = { CT: CT, calcular: calcular, crearXlsx: crearXlsx };
+  var api = { CT: CT, LIM: LIM, laborables: laborables, calcular: calcular, crearXlsx: crearXlsx };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Calc = api;
 })(typeof window !== 'undefined' ? window : this);
