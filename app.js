@@ -258,12 +258,11 @@
     sel = sel || ms[0]; st.file = null;
     var h = '<div class="card"><h2>Exportar a Excel</h2><label>Mes</label><select class="mes" id="e_m">' + ms.map(function (k) { return '<option value="' + k + '"' + (k === sel ? ' selected' : '') + '>' + ymLabel(k) + '</option>'; }).join('') + '</select>' +
       '<div class="file"><b id="e_n"></b>Hojas: Arco (Zotal) · Peladora CS1 · Jumbos CS3</div><div id="e_r"></div>' +
-      '<button class="p" id="e_g">Generar Excel</button><button class="s" id="e_x">Cerrar</button></div>';
+      '<button class="s" id="e_x">Cerrar</button></div>';
     $('ex').innerHTML = h; $('ex').style.display = 'block';
     function nom() { $('e_n').textContent = 'Consumos_' + $('e_m').value + '.xlsx'; $('e_r').innerHTML = ''; }
-    nom(); $('e_m').onchange = nom;
+    nom(); generar($('e_m').value); $('e_m').onchange = function () { nom(); generar($('e_m').value); };
     $('e_x').onclick = function () { $('ex').style.display = 'none'; };
-    $('e_g').onclick = function () { generar($('e_m').value); };
     $('ex').scrollIntoView();
   }
   function filasMes(k) {
@@ -292,19 +291,20 @@
   }
   function generar(k) {
     if (!window.JSZip) { alert('No se pudo cargar el generador de Excel. Abre la app con internet una vez.'); return; }
-    $('e_r').innerHTML = '<div class="prev">Generando…</div>';
+    $('e_r').innerHTML = '<div class="prev">Preparando Excel…</div>';
+    var tk = (generar.tk = (generar.tk || 0) + 1);
     C.crearXlsx(window.JSZip, filasMes(k)).then(function (bytes) {
+      if (tk !== generar.tk) return;
       var name = 'Consumos_' + k + '.xlsx', type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
       var blob = new Blob([bytes], { type: type }), file = null;
       try { file = new File([blob], name, { type: type }); } catch (e) {}
       st.file = { blob: blob, file: file, name: name, k: k };
       var puede = file && navigator.canShare && navigator.canShare({ files: [file] });
-      $('e_r').innerHTML = '<div class="big ok"><span style="font-size:20px">Listo</span>' + name + ' · ' + Math.round(bytes.length / 1024) + ' KB</div>' +
-        (puede ? '<button class="p" id="e_s">Compartir (correo, AirDrop, Archivos…)</button>' : '') + '<button class="s" id="e_d">Descargar</button>';
+      $('e_r').innerHTML = (puede ? '<button class="p" id="e_s">✉️ Enviar por correo</button>' : '<button class="p" id="e_d">Descargar Excel</button>');
       if (puede) $('e_s').onclick = function () {
-        navigator.share({ files: [st.file.file], title: st.file.name }).then(function () { marcar(st.file.k); aviso(); }).catch(function () {});
+        navigator.share({ files: [st.file.file], title: 'Consumos ' + ymLabel(st.file.k), text: 'Consumos ' + ymLabel(st.file.k) }).then(function () { marcar(st.file.k); aviso(); }).catch(function () {});
       };
-      $('e_d').onclick = function () {
+      if (!puede) $('e_d').onclick = function () {
         var u = URL.createObjectURL(st.file.blob), a = document.createElement('a');
         a.href = u; a.download = st.file.name; document.body.appendChild(a); a.click();
         setTimeout(function () { URL.revokeObjectURL(u); a.remove(); }, 4000);
