@@ -67,10 +67,10 @@
   function drawForm() {
     var c = st.ctl, h = '';
     h += '<label>Fecha y hora</label><input id="f_ts" type="datetime-local">';
-    if (c === 'arco') h += inp('f_c', 'Contador de agua (m³)') + inp('f_v', 'Varilla del barril (marca, máx. 192)');
+    if (c === 'arco') h += inp('f_c', 'Contador de agua (m³)') + inp('f_v', 'Varilla del barril (marca que lees)');
     if (c === 'pel') h += inp('f_v', 'Varilla del GRG (cm)') + inp('f_q', 'Nº de cerdos (opcional, lo da producción)') + '<label>Dosificación de la bomba</label><input id="f_b" type="text" placeholder="37,5/37,5">';
     if (c === 'jum') h += inp('f_v', 'Varilla del GRG (cm)') + inp('f_j', 'Contador de jumbos lavados (opcional)');
-    h += '<label class="chk"><input id="f_cam" type="checkbox"> ' + (c === 'arco' ? 'Cambio de barril (lleno: 192 en la varilla)' : c === 'jum' ? 'Cambio de GRG (800 L)' : 'Cambio de GRG') + '</label><div id="antes"></div>';
+    h += '<label class="chk"><input id="f_cam" type="checkbox"> ' + (c === 'arco' ? 'Cambio de barril (apunta la marca del barril nuevo)' : c === 'jum' ? 'Cambio de GRG (800 L)' : 'Cambio de GRG') + '</label><div id="antes"></div>';
     h += '<label>Observaciones (opcional)</label><input id="f_obs" type="text">';
     $('formtit').textContent = 'Nueva lectura · ' + CT[c].nombre + ' (' + CT[c].prod + ')';
     $('form').innerHTML = h;
