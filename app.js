@@ -300,14 +300,14 @@
       try { file = new File([blob], name, { type: type }); } catch (e) {}
       st.file = { blob: blob, file: file, name: name, k: k };
       var puede = file && navigator.canShare && navigator.canShare({ files: [file] });
-      $('e_r').innerHTML = (puede ? '<button class="p" id="e_s">✉️ Enviar por correo</button>' : '') + '<button class="p" id="e_d" style="margin-top:8px">⬇️ Descargar Excel</button>';
+      $('e_r').innerHTML = (puede && !/Android/i.test(navigator.userAgent) ? '<button class="p" id="e_s">✉️ Enviar por correo</button>' : '') + '<button class="p" id="e_d" style="margin-top:8px">⬇️ Descargar Excel</button>' + (/Android/i.test(navigator.userAgent) ? '<div class="prev">Al descargar, abre el archivo desde la notificación (o Archivos › Descargas) y compártelo por correo.</div>' : '');
       function bajar() {
         var u = URL.createObjectURL(st.file.blob), a = document.createElement('a');
         a.href = u; a.download = st.file.name; document.body.appendChild(a); a.click();
         setTimeout(function () { URL.revokeObjectURL(u); a.remove(); }, 4000);
         marcar(st.file.k); aviso();
       }
-      if (puede) $('e_s').onclick = function () {
+      if ($('e_s')) $('e_s').onclick = function () {
         var p;
         try { p = navigator.share({ files: [st.file.file], title: st.file.name }); } catch (e) { p = Promise.reject(e); }
         p.then(function () { marcar(st.file.k); aviso(); }).catch(function (e) {
