@@ -301,8 +301,20 @@
       st.file = { blob: blob, file: file, name: name, k: k };
       var puede = file && navigator.canShare && navigator.canShare({ files: [file] });
       $('e_r').innerHTML = (puede ? '<button class="p" id="e_s">✉️ Enviar por correo</button>' : '<button class="p" id="e_d">Descargar Excel</button>');
+      function bajar() {
+        var u = URL.createObjectURL(st.file.blob), a = document.createElement('a');
+        a.href = u; a.download = st.file.name; document.body.appendChild(a); a.click();
+        setTimeout(function () { URL.revokeObjectURL(u); a.remove(); }, 4000);
+        marcar(st.file.k); aviso();
+      }
       if (puede) $('e_s').onclick = function () {
-        navigator.share({ files: [st.file.file], title: 'Consumos ' + ymLabel(st.file.k), text: 'Consumos ' + ymLabel(st.file.k) }).then(function () { marcar(st.file.k); aviso(); }).catch(function () {});
+        var p;
+        try { p = navigator.share({ files: [st.file.file], title: st.file.name }); } catch (e) { p = Promise.reject(e); }
+        p.then(function () { marcar(st.file.k); aviso(); }).catch(function (e) {
+          if (e && e.name === 'AbortError') return;
+          $('e_r').insertAdjacentHTML('beforeend', '<div class="prev" style="color:#b91c1c">No se pudo abrir el correo (' + esc((e && (e.name + ' ' + e.message)) || 'error') + '). Pulsa Descargar y adjúntalo desde tu correo.</div><button class="p" id="e_d2">Descargar Excel</button>');
+          $('e_d2').onclick = bajar;
+        });
       };
       if (!puede) $('e_d').onclick = function () {
         var u = URL.createObjectURL(st.file.blob), a = document.createElement('a');
