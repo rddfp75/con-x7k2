@@ -300,7 +300,7 @@
       try { file = new File([blob], name, { type: type }); } catch (e) {}
       st.file = { blob: blob, file: file, name: name, k: k };
       var puede = file && navigator.canShare && navigator.canShare({ files: [file] });
-      $('e_r').innerHTML = (puede ? '<button class="p" id="e_s">✉️ Enviar por correo</button>' : '<button class="p" id="e_d">Descargar Excel</button>');
+      $('e_r').innerHTML = (puede ? '<button class="p" id="e_s">✉️ Enviar por correo</button>' : '') + '<button class="p" id="e_d" style="margin-top:8px">⬇️ Descargar Excel</button>';
       function bajar() {
         var u = URL.createObjectURL(st.file.blob), a = document.createElement('a');
         a.href = u; a.download = st.file.name; document.body.appendChild(a); a.click();
@@ -312,16 +312,10 @@
         try { p = navigator.share({ files: [st.file.file], title: st.file.name }); } catch (e) { p = Promise.reject(e); }
         p.then(function () { marcar(st.file.k); aviso(); }).catch(function (e) {
           if (e && e.name === 'AbortError') return;
-          $('e_r').insertAdjacentHTML('beforeend', '<div class="prev" style="color:#b91c1c">No se pudo abrir el correo (' + esc((e && (e.name + ' ' + e.message)) || 'error') + '). Pulsa Descargar y adjúntalo desde tu correo.</div><button class="p" id="e_d2">Descargar Excel</button>');
-          $('e_d2').onclick = bajar;
+          $('e_r').insertAdjacentHTML('beforeend', '<div class="prev" style="color:#b91c1c">No se pudo abrir el correo (' + esc((e && (e.name + ' ' + e.message)) || 'error') + '). Usa el botón Descargar Excel y adjúntalo desde tu correo.</div>');
         });
       };
-      if (!puede) $('e_d').onclick = function () {
-        var u = URL.createObjectURL(st.file.blob), a = document.createElement('a');
-        a.href = u; a.download = st.file.name; document.body.appendChild(a); a.click();
-        setTimeout(function () { URL.revokeObjectURL(u); a.remove(); }, 4000);
-        marcar(st.file.k); aviso();
-      };
+      $('e_d').onclick = bajar;
     }).catch(function (e) { $('e_r').innerHTML = '<div class="big bad"><span style="font-size:18px">Error</span>' + esc(e.message) + '</div>'; });
   }
 

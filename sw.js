@@ -1,4 +1,4 @@
-var CACHE = 'consumos-v7';
+var CACHE = 'consumos-v8';
 var FILES = ['./', 'index.html', 'app.js', 'calc.js', 'firebase-config.js', 'manifest.json', 'icon-192.png', 'icon-512.png', 'jszip.min.js'];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(FILES); }).then(function () { return self.skipWaiting(); }));
